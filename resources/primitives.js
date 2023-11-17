@@ -25,3 +25,16 @@ function getRectVertices(cX, cY, horSide, verSide) {
         cX - horSide / 2, cY + verSide / 2
     ]
 }
+
+function getRectTexcoord() {
+    return [
+        /* Bottom left triangle */
+        0, 1,
+        0, 0,
+        1, 0,
+        /* Top right triangle */
+        1, 0,
+        1, 1,
+        0, 1
+    ]
+}
