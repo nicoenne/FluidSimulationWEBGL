@@ -1,10 +1,11 @@
 import { vertex as vertexShaderSource } from './assets/particleShader.vert.js';
 import { vertex as fragmentShaderSource } from './assets/particleShader.frag.js';
 
-function main() {
+var numberOfParticles = 1000;
+var particles = [];
+var gravity = new Vector(0, 0);
 
-    // Get A WebGL context
-    /** @type {HTMLCanvasElement} */
+function main() {
     const canvas = document.querySelector("#c");
     const gl = canvas.getContext("webgl");
     gl.getExtension("OES_standard_derivatives");
@@ -20,28 +21,28 @@ function main() {
     const program = createProgram(gl, vertexShader, fragmentShader);
     gl.useProgram(program);
 
-    var numberOfParticles = 20;
-    var particleSize = 10;
-    var positions = [];
-    var velocities = [];
-
-    var gravity = 100;
-    var boundSize = new Array(gl.canvas.width, gl.canvas.height);
-    var collisionDamping = 0.5;
-    
-    for (let i=0; i<numberOfParticles; i++) {
-        let x = (Math.random() - 0.5) * canvas.width;
-        let y = (Math.random() - 0.5) * canvas.height;
-        positions.push(new Array(x, y));
-        velocities.push(new Array(0.0, 0.0));
-    }
-
     var positionLocation = gl.getAttribLocation(program, "a_position");
     var texcoordLocation = gl.getAttribLocation(program, "a_texcoord");
     var resolutionLocation = gl.getUniformLocation(program, "u_resolution");
 
     var positionBuffer = gl.createBuffer();
     var texcoordBuffer = gl.createBuffer();
+
+    var timeElement = document.querySelector("#time");
+    var densityElement = document.querySelector("#density");
+    
+    var timeNode = document.createTextNode("");
+    var densityNode = document.createTextNode("");
+    
+    // Add those text nodes where they need to go
+    timeElement.appendChild(timeNode);
+    densityElement.appendChild(densityNode);
+
+    for (let i = 0; i < numberOfParticles; i ++) {
+        let x = (Math.random() - 0.5) * canvas.width;
+        let y = (Math.random() - 0.5) * canvas.height;
+        particles.push(new Particle(x, y));
+    }
 
     var then = 0;
  
@@ -54,32 +55,12 @@ function main() {
         then = now;
 
         /* Do the physics */
+        particles.forEach((particle) => {
+            particle.applyForce(gravity);
+            particle.update();
+        })
 
-        for (let i=0; i<numberOfParticles; i++) {
-            velocities[i][0] += 0 * deltaTime;
-            velocities[i][1] += gravity * deltaTime;
-        }
-
-        for (let i=0; i<numberOfParticles; i++) {
-            positions[i][0] += velocities[i][0] * deltaTime;
-            positions[i][1] += velocities[i][1] * deltaTime;
-        }
-
-        for (let i=0; i<numberOfParticles; i++) {
-            let halfBoundSizeX = boundSize[0] / 2 - particleSize / 2;
-
-            if (Math.abs(positions[i][0]) > halfBoundSizeX) {
-                positions[i][0] = halfBoundSizeX * Math.sign(positions[i][0]);
-                velocities[i][0] *= -1 * collisionDamping;
-            }
-
-            let halfBoundSizeY = boundSize[1] / 2 - particleSize / 2;
-
-            if (Math.abs(positions[i][1]) > halfBoundSizeY) {
-                positions[i][1] = halfBoundSizeY * Math.sign(positions[i][1]);
-                velocities[i][1] *= -1 * collisionDamping;
-            }
-        }
+        resolveCollision(particles, gl.canvas.width, gl.canvas.height);
 
         /* Rendering */
         gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
@@ -89,31 +70,28 @@ function main() {
 
         /* Passing buffers */
 
-        positions.forEach((pos) => {
-            /* Positions*/
-            gl.enableVertexAttribArray(positionLocation);
-            gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
+        gl.enableVertexAttribArray(texcoordLocation);
+        gl.bindBuffer(gl.ARRAY_BUFFER, texcoordBuffer);
+        let quadTexcoords = getRectTexcoord();
+        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(quadTexcoords), gl.STATIC_DRAW);
+        gl.vertexAttribPointer(texcoordLocation, 2, gl.FLOAT, false, 0, 0);
 
-            let quadVertices = getRectVertices(pos[0], pos[1], particleSize, particleSize);
+        gl.enableVertexAttribArray(positionLocation);
+        gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
+        particles.forEach(particle => {
+            let quadVertices = getRectVertices(particle.pos.x, particle.pos.y, particle.size, particle.size);
             gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(quadVertices), gl.DYNAMIC_DRAW);
             gl.vertexAttribPointer(positionLocation, 2, gl.FLOAT, false, 0, 0);
-
-            /* Texcoords */
-            gl.enableVertexAttribArray(texcoordLocation);
-            gl.bindBuffer(gl.ARRAY_BUFFER, texcoordBuffer);
-
-            let quadTexcoords = getRectTexcoord();
-            gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(quadTexcoords), gl.STATIC_DRAW);
-            gl.vertexAttribPointer(texcoordLocation, 2, gl.FLOAT, false, 0, 0);
-
             gl.drawArrays(gl.TRIANGLES, 0, quadVertices.length / 2);
-        })    
+        });
+        
+        timeNode.nodeValue = now.toFixed(2);
+        let density = CalculateDensity(particles, new Vector(0, 0));
+        densityNode.nodeValue = density.toFixed(5);
         
         /* Next frame */
         requestAnimationFrame(drawScene);
     }
-
-
 }  // end main
 
 main();

@@ -1,5 +1,13 @@
 canvas {
     height:720px;
-    width:1080px;
+    width:720px;
     border:1px solid black
+}
+.container {
+    position: relative;
+}
+#overlay {
+    position: absolute;
+    left: 10px;
+    top: 10px;
 }
